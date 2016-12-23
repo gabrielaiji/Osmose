@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8">
+		<title>Osmosis</title>
+	</head>
+<body>
+	<div>
+    <p id="volume1">volume 1 (mL)</p>
+    <input type="text" id="volume1Input" style="width:180px"/>
+    <p> mol 1</p>
+    <input type="text" id="mol1Input" style="width:180px"/>
+	</div>
+	<div>
+	  <p id="volume2">volume 2 (mL)</p>
+	  <input type="text" id= "volume2Input" style="width:180px"/>
+	  <p> mol 2</p>
+	  <input type="text" id= "mol2Input" style="width:180px"/>
+	</div>
+
+  <button onclick='submitFunction()'>Soumettre</button>
+	<div>
+		<canvas id='canvas' style='border: 1px solid #FFF'></canvas>
+	</div>
+
+	<div class="box" id="consoleBox" style="background-color:#FFCC99">
+		<p id='consoleInput'>Les milieux ne sont pas équilibrés</p>
+	</div>
+
+	<div>
+		<p style="font-size: 15px; margin-bottom:0px">Volume 1 :</p>
+		<p id="printVolume1">N/A</p>
+		<p style="font-size: 15px; margin-bottom:0px">Concentration 1 :</p>
+		<p id="printConcentration1" style="margin-bottom: 0px">N/A</p>
+	</div>
+	<div>
+		<p style="font-size: 15px; margin-bottom:0px" >Volume 2 :</p>
+		<p id="printVolume2">N/A</p>
+		<p style="font-size: 15px; margin-bottom:0px">Concentration 2 :</p>
+		<p id="printConcentration2" style="margin-bottom: 0px">N/A</p>
+	</div>
+
+  <script>
+
+  var canvas = document.getElementById('canvas');
+  var ctx = canvas.getContext('2d');
+  var wBlocks = 314, hBlocks = 155, blockSize = 1;
+  var w = wBlocks * blockSize, h = hBlocks * blockSize;
+  var posM = 157, wallThickness = 5, membraneThickness = 3;//L'épaisseur de la membrane doit être impaire
+
+  canvas.setAttribute('width', w);
+  canvas.setAttribute('height', h);
+
+  var userInput = false;
+  var done = false;//true when osmose is done
+	var stop = false;//true when exception
+
+  var mol1 = 100, mol2 = 50;
+
+  var wPool1 = posM - 2 - wallThickness;
+  var wPool2 = wBlocks - wallThickness - posM - 2;
+
+  if(!userInput){
+    var hPool1 = 75;
+    var hPool2 = 75;
+  }
+
+	var maxheight = hBlocks - wallThickness;
+	var maxVolume1 = maxheight * wPool1;
+	var maxVolume2 = maxheight * wPool2;
+
+  var colors = {
+    'W': 'rgb(0, 0, 0)',
+    ' ': 'rgb(255, 255, 255)',
+    'M': 'rgb(160, 160, 160)',
+    'L': 'rgb(102, 255, 255)'
+  }
+
+  function isNumber(n) {
+    return !isNaN(parseFloat(n)) && isFinite(n);
+  }
+
+  function drawSquare(j, i, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(j * blockSize, i * blockSize, blockSize, blockSize);
+  }
+
+
+  var world = new Array();
+  for(var o = 0; o < hBlocks; o++){
+    world[o] = new Array();
+  }
+
+  function createWorld(){
+    var j = 0, i = 0;
+
+    for(j = 0; j < hBlocks; j++){//Fill Air the whole thing
+      for(i = 0; i < wBlocks; i++){
+        world[j][i] = ' ';
+      }
+    }
+
+    for(j = 0; j < hBlocks; j++){//make Wall Left + Right
+      for(i = 0; i < wallThickness; i++){
+        world[j][i] = 'W';
+        world[j][wBlocks-1-i] = 'W';
+      }
+    }
+    for(j = 0; j < wallThickness; j++){//make Wall bottom
+      for(i = 0; i < wBlocks; i++){
+        world[hBlocks-1-j][i] = 'W';
+      }
+    }
+
+
+    for(j = 0; j < hBlocks - wallThickness; j++){// make Membrane Plasmique
+      for(i = -(membraneThickness-1)/2; i < (membraneThickness-1)/2 + 1; i++){
+        world[j][posM+i] = 'M';
+      }
+    }
+  }
+
+  function drawWorld() {
+      // Colors the canvas
+      for (var j = 0; j < hBlocks ; j++) {
+          for (var i = 0; i < wBlocks ; i++) {
+              var t = world[j][i];
+              var color = colors[t];
+              drawSquare(i, j, color);
+          }
+        }
+    }
+
+  function updateWorld(){
+
+    for(var j = hBlocks - Math.round(hPool1) - wallThickness; j < hBlocks - wallThickness; j++){//Fill Water Pool1
+      for(var i = wallThickness; i < wPool1 + wallThickness + 1; i++){
+        world[j][i] = 'L';
+      }
+    }
+
+
+    for(var j = 0; j < hBlocks - Math.round(hPool1) - wallThickness; j++){//Fill Air Pool1
+      for(var i = wallThickness; i < wPool1 + wallThickness + 1; i++){
+        world[j][i] = ' ';
+      }
+    }
+
+    for(var j = hBlocks - Math.round(hPool2) - wallThickness; j < hBlocks - wallThickness; j++){// Fill Water Pool2
+      for(var i = wBlocks - wallThickness - wPool2 - 1; i < wBlocks - wallThickness; i++){
+        world[j][i] = 'L';
+      }
+    }
+
+    for(var j = 0; j < hBlocks - Math.round(hPool2) - wallThickness; j++){//Fill Air Pool2
+      for(var i = wBlocks - wallThickness - wPool2- 1; i < wBlocks - wallThickness; i++){
+        world[j][i] = ' ';
+      }
+    }
+  }
+
+
+  var volume1 = wPool1 * hPool1;
+  var volume2 = wPool2 * hPool2;
+
+  var concentration1 = mol1 / volume1;
+  var concentration2 = mol2 / volume2;
+
+  function osmose(){
+    volume1 = wPool1 * hPool1;
+    volume2 = wPool2 * hPool2;
+
+    concentration1 = mol1 / volume1;
+    concentration2 = mol2 / volume2;
+
+    if(concentration2 < concentration1){
+      if(!(mol2 / (wPool2 *(Number(hPool2) - 1)) > mol1 / (wPool1 *(Number(hPool1) + 1)))){//Evite un va et vient du courant d'eau
+        hPool1++;
+        hPool2--;
+      }
+      else {
+        done = true;
+      }
+    }
+    else if (concentration1 < concentration2) {
+      if(!(mol1 / (wPool1 *(Number(hPool1) - 1)) > mol2 / (wPool2 *(Number(hPool2) + 1)))){//Evite un va et vient du courant d'eau
+        hPool2++;
+        hPool1--;
+      }
+      else {
+        done = true;
+      }
+    }
+    else {
+      done = true;
+    }
+		if(hPool1 >= maxheight || hPool2 >= maxheight){
+			stop = true;
+		}
+  }
+
+
+  function animateWorld() {
+    if(!done){
+      osmose();
+
+			if(!stop){
+				updateWorld();
+	      drawWorld();
+	      document.getElementById('printVolume1').innerHTML = (hPool1 * wPool1) / 100 + " mL";
+				document.getElementById('printConcentration1').innerHTML = concentration1 * 100 + " mol/mL";
+				document.getElementById('printVolume2').innerHTML = (hPool2 * wPool2) / 100 + " mL";
+				document.getElementById('printConcentration2').innerHTML = concentration2 * 100 + " mol/mL";
+
+	      window.requestAnimationFrame(animateWorld);
+			}
+			else {
+				document.getElementById('consoleInput').innerHTML = "Le programme s'est arrêté dû à un trop grand volume d'eau dans un des deux milieux. Veuillez réduire vos volumes.";
+				document.getElementById('consoleBox').style.backgroundColor="#FF9999";
+			}
+
+    }
+    else {
+      document.getElementById('consoleInput').innerHTML = 'Les deux milieux sont équilibrés en concentration';
+			document.getElementById('consoleBox').style.backgroundColor="#99FF99";
+    }
+  }
+
+  function submitFunction(){
+    userInput = true;
+
+    if(!isNumber(document.getElementById('volume1Input').value)){
+      document.getElementById('volume1Input').value = 'un nombre svp';
+			document.getElementById('volume1Input').style.border = '1px solid #FF9999';
+      userInput = false;
+    }
+    else if(document.getElementById('volume1Input').value >= maxVolume1 / 100){
+      document.getElementById('volume1Input').value = '< '+ maxVolume1 / 100 +' svp';
+			document.getElementById('volume1Input').style.border = '1px solid #FF9999';
+      userInput = false;
+    }
+    else {
+      hPool1 = (document.getElementById('volume1Input').value) * 100/ wPool1;
+			document.getElementById('volume1Input').style.border = '1px solid #99FF99';
+    }
+
+    if(!isNumber(document.getElementById('volume2Input').value)){
+      document.getElementById('volume2Input').value = 'un nombre svp';
+			document.getElementById('volume2Input').style.border = '1px solid #FF9999';
+      userInput = false;
+    }
+    else if (document.getElementById('volume2Input').value >= maxVolume2 / 100) {
+      document.getElementById('volume2Input').value = '< '+ maxVolume2 / 100 +' svp';
+			document.getElementById('volume2Input').style.border = '1px solid #FF9999';
+      userInput = false;
+    }
+    else {
+      hPool2 = (document.getElementById('volume2Input').value) * 100/ wPool2;
+			document.getElementById('volume2Input').style.border = '1px solid #99FF99';
+    }
+
+    if(!isNumber(document.getElementById('mol1Input').value)){
+      document.getElementById('mol1Input').value = 'un nombre svp';
+			document.getElementById('mol1Input').style.border = '1px solid #FF9999';
+      userInput = false;
+    }
+    else{
+      mol1 = document.getElementById('mol1Input').value;
+			document.getElementById('mol1Input').style.border = '1px solid #99FF99';
+    }
+
+    if(!isNumber(document.getElementById('mol2Input').value)){
+      document.getElementById('mol2Input').value = 'un nombre svp';
+			document.getElementById('mol2Input').style.border = '1px solid #FF9999';
+      userInput = false;
+    }
+    else{
+      mol2 = document.getElementById('mol2Input').value;
+			document.getElementById('mol2Input').style.border = '1px solid #99FF99';
+    }
+
+    if(userInput){
+      done = false;
+			stop = false;
+      document.getElementById('consoleInput').innerHTML = 'Les milieux ne sont pas équilibrés';
+			document.getElementById('consoleBox').style.backgroundColor="#FFCC99";
+      window.requestAnimationFrame(animateWorld);
+    }
+  }
+
+  function start(){
+    createWorld();
+    animateWorld();
+  }
+
+  updateWorld();
+  drawWorld();
+  start();
+
+  </script>
+</body>
+</html>
